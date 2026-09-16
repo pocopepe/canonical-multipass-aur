@@ -1,0 +1,48 @@
+name: Check upstream multipass version
+
+on:
+  schedule:
+    # daily
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  issues: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compare packaged vs latest upstream version
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          current=$(grep -Po '^pkgver=\K.*' PKGBUILD)
+          latest=$(gh api repos/canonical/multipass/releases/latest --jq .tag_name | sed 's/^v//')
+
+          echo "packaged: $current"
+          echo "latest upstream: $latest"
+
+          if [ "$current" = "$latest" ]; then
+            echo "up to date, nothing to do"
+            exit 0
+          fi
+
+          title="multipass $latest released (packaged: $current)"
+
+          # avoid opening a duplicate issue on every run
+          existing=$(gh issue list --search "\"$title\" in:title" --state open --json number --jq 'length')
+          if [ "$existing" -gt 0 ]; then
+            echo "issue already open for $latest, skipping"
+            exit 0
+          fi
+
+          gh issue create \
+            --title "$title" \
+            --body "Upstream [multipass $latest](https://github.com/canonical/multipass/releases/tag/v$latest) is out; this package is still on $current.
+
+          Run the [Verify PKGBUILD](../../actions/workflows/verify.yml) workflow after bumping \`pkgver\` to check it still builds."
