@@ -1,0 +1,45 @@
+name: Verify PKGBUILD
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux:base-devel
+      options: --user root
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          pacman -Syu --noconfirm --needed \
+            git cmake libvirt zip unzip ninja sudo namcap
+
+      - name: Create unprivileged build user
+        run: |
+          useradd -m builder
+          echo 'builder ALL=(ALL) NOPASSWD: ALL' > /etc/sudoers.d/builder
+          chown -R builder:builder "$GITHUB_WORKSPACE"
+
+      - name: makepkg --printsrcinfo matches committed .SRCINFO
+        run: |
+          su builder -c 'makepkg --printsrcinfo' > /tmp/generated.SRCINFO
+          diff -u .SRCINFO /tmp/generated.SRCINFO
+
+      - name: namcap PKGBUILD
+        run: su builder -c 'namcap PKGBUILD'
+
+      - name: Build package
+        run: su builder -c 'makepkg -s --noconfirm --nocheck'
+
+      - name: namcap built package
+        run: su builder -c 'namcap *.pkg.tar.zst'
+
+      - name: Sanity-check installed binaries
+        run: |
+          pacman -U --noconfirm canonical-multipass-*.pkg.tar.zst
+          ldd /usr/bin/multipass | grep -i "not found" && exit 1 || true
+          ldd /usr/bin/multipassd | grep -i "not found" && exit 1 || true
+          echo "binaries link cleanly"
