@@ -12,7 +12,7 @@ source=("git+https://github.com/canonical/${_realname}.git#tag=v${pkgver}"
         multipassd.service
         fmt11-cxx20-compat.patch
         yaml-cpp-cstdint.patch)
-depends=('glibc' 'gcc-libs' 'systemd-libs' 'apparmor' 'openssl' 'qt6-base' 'qemu-base')
+depends=('glibc' 'gcc-libs' 'systemd-libs' 'apparmor' 'openssl' 'qt6-base' 'qemu-base' 'edk2-ovmf')
 makedepends=('git' 'cmake' 'libvirt' 'zip' 'unzip' 'ninja')
 optdepends=(
     'libvirt: to use the libvirt driver'
@@ -53,6 +53,13 @@ package() {
   # not needed in package
   rm "$pkgdir"/usr/lib/libssh.a
   install -Dm644 "$srcdir"/multipassd.service "$pkgdir"/usr/lib/systemd/system/multipassd.service
+
+  # multipass hardcodes `-bios OVMF.fd` for QEMU, searched relative to QEMU's
+  # own firmware dir (/usr/share/qemu). edk2-ovmf no longer ships a bare
+  # OVMF.fd there (only OVMF.4m.fd under /usr/share/edk2/x64), so every VM
+  # launch fails with "could not load PC BIOS 'OVMF.fd'" without this symlink.
+  install -d "$pkgdir"/usr/share/qemu
+  ln -s /usr/share/edk2/x64/OVMF.4m.fd "$pkgdir"/usr/share/qemu/OVMF.fd
 }
 
 sha256sums=('SKIP'

@@ -18,6 +18,7 @@ pkgbase = canonical-multipass
 	depends = openssl
 	depends = qt6-base
 	depends = qemu-base
+	depends = edk2-ovmf
 	optdepends = libvirt: to use the libvirt driver
 	source = git+https://github.com/canonical/multipass.git#tag=v1.16.4
 	source = multipassd.service
